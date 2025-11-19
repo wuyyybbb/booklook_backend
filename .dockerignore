@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# 虚拟环境
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 测试
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# 上传的文件（构建时不需要）
+uploads/*
+!uploads/.gitkeep
+
+# 临时文件
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# 文档
+README.md
+*.md
+docs/
+
+# 测试文件
+test_*.py
+*_test.py
+
+# Docker
+docker-compose.yml
+Dockerfile
+.dockerignore

@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  # Redis 服务
+  redis:
+    image: redis:7-alpine
+    container_name: formy-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI 后端服务
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: formy-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # 应用配置
+      - APP_NAME=Formy API
+      - APP_VERSION=1.0.0
+      - DEBUG=false
+      
+      # Redis 配置
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      
+      # JWT 配置（本地测试用，生产环境请使用 .env）
+      - SECRET_KEY=your-secret-key-change-in-production
+      - ACCESS_TOKEN_EXPIRE_MINUTES=43200
+      
+      # 邮件配置（需要填写真实值）
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - FROM_EMAIL=support@formy.it.com
+      
+      # CORS 配置
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+    volumes:
+      # 挂载代码（开发时实时更新）
+      - ./app:/app/app
+      # 挂载上传目录（持久化）
+      - uploads_data:/app/uploads
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Worker 服务（可选，用于处理异步任务）
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: formy-worker
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+    volumes:
+      - ./app:/app/app
+      - uploads_data:/app/uploads
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: python run_worker_simple.py
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+    driver: local
+  uploads_data:
+    driver: local

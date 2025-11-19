@@ -1,0 +1,99 @@
+# Render 部署配置
+# 文档: https://render.com/docs/blueprint-spec
+
+services:
+  # Backend API 服务
+  - type: web
+    name: formy-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free  # 可选: free, starter, standard, pro
+    region: oregon  # 可选: oregon, frankfurt, singapore
+    branch: main
+    
+    # 健康检查
+    healthCheckPath: /health
+    
+    # 环境变量
+    envVars:
+      - key: APP_NAME
+        value: Formy API
+      
+      - key: APP_VERSION
+        value: 1.0.0
+      
+      - key: DEBUG
+        value: false
+      
+      # Redis 连接（使用 Render Redis 服务）
+      - key: REDIS_HOST
+        fromService:
+          type: redis
+          name: formy-redis
+          property: host
+      
+      - key: REDIS_PORT
+        fromService:
+          type: redis
+          name: formy-redis
+          property: port
+      
+      - key: REDIS_DB
+        value: 0
+      
+      # JWT 密钥（从 Secret 中读取）
+      - key: SECRET_KEY
+        generateValue: true
+      
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: 43200
+      
+      # 邮件配置（需要在 Render Dashboard 中设置）
+      - key: RESEND_API_KEY
+        sync: false
+      
+      - key: FROM_EMAIL
+        value: support@formy.it.com
+      
+      # CORS 配置（替换为你的前端域名）
+      - key: CORS_ORIGINS
+        value: https://formy-frontend.vercel.app,http://localhost:3000
+    
+    # 自动部署
+    autoDeploy: true
+
+  # Redis 服务
+  - type: redis
+    name: formy-redis
+    plan: free  # 可选: free, starter, standard, pro
+    region: oregon
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []  # 空列表表示只允许同一账号的服务访问
+
+# 可选: Worker 服务（处理异步任务）
+# - type: worker
+#   name: formy-worker
+#   runtime: docker
+#   dockerfilePath: ./Dockerfile
+#   dockerContext: .
+#   plan: free
+#   region: oregon
+#   branch: main
+#   dockerCommand: python run_worker_simple.py
+#   
+#   envVars:
+#     - key: REDIS_HOST
+#       fromService:
+#         type: redis
+#         name: formy-redis
+#         property: host
+#     
+#     - key: REDIS_PORT
+#       fromService:
+#         type: redis
+#         name: formy-redis
+#         property: port
+#     
+#     - key: REDIS_DB
+#       value: 0
