@@ -38,10 +38,14 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 小时
     
     # CORS 配置
-    CORS_ORIGINS: list = [
-        "http://localhost:3000",
-        "http://localhost:5173",  # Vite 默认端口
-    ]
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
+    
+    @property
+    def get_cors_origins(self) -> list:
+        """解析 CORS 配置（支持逗号分隔的字符串）"""
+        if isinstance(self.CORS_ORIGINS, str):
+            return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+        return self.CORS_ORIGINS
     
     # Engine 配置文件路径
     ENGINE_CONFIG_PATH: str = "./engine_config.yml"
