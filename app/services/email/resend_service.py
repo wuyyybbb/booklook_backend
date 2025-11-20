@@ -218,8 +218,17 @@ class ResendEmailService:
                             print(f"   ⚠️  API Key 无效或已过期")
                             print(f"   ⚠️  请检查: 1) API Key 是否正确 2) 是否已过期 3) 是否被撤销")
                         elif response.status_code == 403:
-                            print(f"   ⚠️  API Key 权限不足")
-                            print(f"   ⚠️  请检查: API Key 权限是否为 'Full access' 或 'Sending access'")
+                            # 检查是否是免费版限制
+                            if "testing emails" in error_detail.lower() or "your own email" in error_detail.lower():
+                                print(f"   ⚠️  Resend 免费版限制：只能发送到账户注册邮箱")
+                                print(f"   ⚠️  当前尝试发送到: {to_email}")
+                                print(f"   ⚠️  解决方案:")
+                                print(f"      1. 升级到 Resend 付费版（推荐）")
+                                print(f"      2. 使用账户注册邮箱进行测试")
+                                print(f"      3. 验证域名后使用自定义域名发送")
+                            else:
+                                print(f"   ⚠️  API Key 权限不足")
+                                print(f"   ⚠️  请检查: API Key 权限是否为 'Full access' 或 'Sending access'")
                         elif response.status_code == 422:
                             print(f"   ⚠️  请求参数错误")
                             print(f"   ⚠️  请检查: 1) 发件邮箱格式 2) 收件邮箱格式 3) 邮件内容")

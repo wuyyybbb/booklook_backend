@@ -65,9 +65,12 @@ async def send_verification_code(request: SendCodeRequest):
         
         if not send_result:
             print(f"❌ 邮件发送失败，请查看上方详细错误信息")
+            
+            # 检查是否是 Resend 免费版限制
+            # 这个信息会在邮件服务的日志中显示，但我们也在这里提供更友好的错误提示
             raise HTTPException(
                 status_code=500,
-                detail="发送邮件失败，请检查后端日志获取详细错误信息，或确认 RESEND_API_KEY 是否正确配置"
+                detail="发送邮件失败。如果是 Resend 免费版，只能发送到账户注册邮箱。请查看后端日志获取详细错误信息。"
             )
         
         print(f"✅ 验证码发送成功: {request.email}")
