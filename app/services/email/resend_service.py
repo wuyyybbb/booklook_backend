@@ -152,47 +152,92 @@ class ResendEmailService:
             </html>
             """
             
+            # 准备请求数据
+            request_data = {
+                "from": self.from_email,  # Resend 推荐直接使用邮箱地址
+                "to": [to_email],
+                "subject": f"【Formy】您的验证码是 {code}",
+                "html": html_content,
+            }
+            
+            print(f"📤 请求 Resend API:")
+            print(f"   - URL: {self.api_url}")
+            print(f"   - From: {self.from_email}")
+            print(f"   - To: {to_email}")
+            print(f"   - Subject: {request_data['subject']}")
+            
             async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    self.api_url,
-                    headers={
-                        "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "from": f"Formy <{self.from_email}>",
-                        "to": [to_email],
-                        "subject": f"【Formy】您的验证码是 {code}",
-                        "html": html_content,
-                    },
-                    timeout=10.0,
-                )
-                
-                if response.status_code == 200:
-                    print(f"✅ 验证码邮件已发送到: {to_email}")
-                    return True
-                else:
-                    # 详细错误信息
-                    error_detail = response.text
-                    try:
-                        error_json = response.json()
-                        if "message" in error_json:
-                            error_detail = error_json["message"]
-                    except:
-                        pass
+                try:
+                    response = await client.post(
+                        self.api_url,
+                        headers={
+                            "Authorization": f"Bearer {self.api_key}",
+                            "Content-Type": "application/json",
+                        },
+                        json=request_data,
+                        timeout=30.0,  # 增加超时时间到30秒
+                    )
                     
-                    print(f"❌ Resend API 返回错误:")
+                    # 打印响应状态
+                    print(f"📥 Resend API 响应:")
                     print(f"   - 状态码: {response.status_code}")
-                    print(f"   - 错误信息: {error_detail}")
+                    print(f"   - 响应头: {dict(response.headers)}")
                     
-                    # 常见错误提示
-                    if response.status_code == 401:
-                        print(f"   ⚠️  API Key 无效或已过期，请检查 RESEND_API_KEY")
-                    elif response.status_code == 403:
-                        print(f"   ⚠️  API Key 权限不足，请检查权限设置")
-                    elif response.status_code == 422:
-                        print(f"   ⚠️  请求参数错误，请检查邮箱地址格式")
-                    
+                    if response.status_code == 200:
+                        try:
+                            response_data = response.json()
+                            print(f"   - 响应内容: {response_data}")
+                            if "id" in response_data:
+                                print(f"✅ 验证码邮件已发送到: {to_email} (邮件ID: {response_data['id']})")
+                            else:
+                                print(f"✅ 验证码邮件已发送到: {to_email}")
+                        except:
+                            print(f"✅ 验证码邮件已发送到: {to_email}")
+                        return True
+                    else:
+                        # 详细错误信息
+                        error_detail = response.text
+                        error_json = None
+                        try:
+                            error_json = response.json()
+                            print(f"   - 错误响应 (JSON): {error_json}")
+                            if "message" in error_json:
+                                error_detail = error_json["message"]
+                            elif "error" in error_json:
+                                error_detail = error_json["error"]
+                        except Exception as e:
+                            print(f"   - 错误响应 (文本): {error_detail}")
+                            print(f"   - JSON 解析失败: {e}")
+                        
+                        print(f"❌ Resend API 返回错误:")
+                        print(f"   - 状态码: {response.status_code}")
+                        print(f"   - 错误信息: {error_detail}")
+                        
+                        # 常见错误提示
+                        if response.status_code == 401:
+                            print(f"   ⚠️  API Key 无效或已过期")
+                            print(f"   ⚠️  请检查: 1) API Key 是否正确 2) 是否已过期 3) 是否被撤销")
+                        elif response.status_code == 403:
+                            print(f"   ⚠️  API Key 权限不足")
+                            print(f"   ⚠️  请检查: API Key 权限是否为 'Full access' 或 'Sending access'")
+                        elif response.status_code == 422:
+                            print(f"   ⚠️  请求参数错误")
+                            print(f"   ⚠️  请检查: 1) 发件邮箱格式 2) 收件邮箱格式 3) 邮件内容")
+                        elif response.status_code == 429:
+                            print(f"   ⚠️  请求频率限制")
+                            print(f"   ⚠️  请稍后重试")
+                        
+                        return False
+                        
+                except httpx.TimeoutException as e:
+                    print(f"❌ 发送邮件超时 (30秒): {e}")
+                    return False
+                except httpx.HTTPStatusError as e:
+                    print(f"❌ HTTP 状态错误: {e.response.status_code}")
+                    print(f"   - 响应内容: {e.response.text}")
+                    return False
+                except httpx.RequestError as e:
+                    print(f"❌ 网络请求失败: {type(e).__name__}: {str(e)}")
                     return False
                     
         except httpx.TimeoutException as e:

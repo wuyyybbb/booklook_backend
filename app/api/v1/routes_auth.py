@@ -211,3 +211,42 @@ async def get_current_user_info(current_user=Depends(get_current_user)):
         )
     )
 
+
+@router.post("/auth/test-email")
+async def test_email_service(email: str = "test@example.com"):
+    """
+    测试邮件服务配置（仅用于调试）
+    
+    发送一封测试邮件到指定邮箱，用于诊断邮件服务问题
+    """
+    try:
+        from app.services.email.resend_service import get_email_service
+        
+        email_service = get_email_service()
+        
+        # 检查配置
+        config_status = {
+            "api_key_configured": bool(email_service.api_key),
+            "api_key_length": len(email_service.api_key) if email_service.api_key else 0,
+            "api_key_preview": f"{email_service.api_key[:10]}...{email_service.api_key[-5:]}" if email_service.api_key and len(email_service.api_key) > 15 else "N/A",
+            "from_email": email_service.from_email,
+        }
+        
+        # 尝试发送测试邮件
+        test_code = "123456"
+        send_result = await email_service.send_verification_code(email, test_code)
+        
+        return {
+            "success": send_result,
+            "config": config_status,
+            "message": "测试邮件已发送" if send_result else "测试邮件发送失败，请查看后端日志"
+        }
+        
+    except Exception as e:
+        import traceback
+        return {
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
+
