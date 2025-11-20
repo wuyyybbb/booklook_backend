@@ -51,14 +51,23 @@ async def send_verification_code(request: SendCodeRequest):
         
         # 发送邮件
         print(f"📤 正在发送邮件到 {request.email}...")
+        
+        # 检查 API Key 是否配置
+        if not email_service.api_key:
+            print(f"❌ RESEND_API_KEY 未配置")
+            raise HTTPException(
+                status_code=500,
+                detail="邮件服务未配置，请检查 RESEND_API_KEY 环境变量"
+            )
+        
         send_result = await email_service.send_verification_code(request.email, code)
         print(f"📤 发送结果: {send_result}")
         
         if not send_result:
-            print(f"❌ 邮件发送失败")
+            print(f"❌ 邮件发送失败，请查看上方详细错误信息")
             raise HTTPException(
                 status_code=500,
-                detail="发送邮件失败，请检查 RESEND_API_KEY 配置"
+                detail="发送邮件失败，请检查后端日志获取详细错误信息，或确认 RESEND_API_KEY 是否正确配置"
             )
         
         print(f"✅ 验证码发送成功: {request.email}")

@@ -11,17 +11,25 @@ class ResendEmailService:
     """Resend 邮件服务类"""
     
     def __init__(self):
-        self.api_key = os.getenv("RESEND_API_KEY", "")
-        self.from_email = os.getenv("FROM_EMAIL", "onboarding@resend.dev")
+        # 从环境变量读取，去除首尾空格
+        self.api_key = os.getenv("RESEND_API_KEY", "").strip()
+        self.from_email = os.getenv("FROM_EMAIL", "onboarding@resend.dev").strip()
         self.api_url = "https://api.resend.com/emails"
         
         print(f"🔧 邮件服务初始化:")
         print(f"   - API Key: {'已配置' if self.api_key else '❌ 未配置'}")
+        if self.api_key:
+            # 只显示前10个字符和后5个字符，保护密钥
+            masked_key = f"{self.api_key[:10]}...{self.api_key[-5:]}" if len(self.api_key) > 15 else "***"
+            print(f"   - API Key 长度: {len(self.api_key)} 字符")
+            print(f"   - API Key 预览: {masked_key}")
         print(f"   - From Email: {self.from_email}")
         
         if not self.api_key:
             print("⚠️  警告: RESEND_API_KEY 未设置，邮件功能将无法使用")
             print("⚠️  请在环境变量中设置 RESEND_API_KEY")
+        elif not self.api_key.startswith("re_"):
+            print("⚠️  警告: RESEND_API_KEY 格式可能不正确（应该以 're_' 开头）")
     
     async def send_verification_code(self, to_email: str, code: str) -> bool:
         """
@@ -164,11 +172,39 @@ class ResendEmailService:
                     print(f"✅ 验证码邮件已发送到: {to_email}")
                     return True
                 else:
-                    print(f"❌ 发送失败: {response.status_code} - {response.text}")
+                    # 详细错误信息
+                    error_detail = response.text
+                    try:
+                        error_json = response.json()
+                        if "message" in error_json:
+                            error_detail = error_json["message"]
+                    except:
+                        pass
+                    
+                    print(f"❌ Resend API 返回错误:")
+                    print(f"   - 状态码: {response.status_code}")
+                    print(f"   - 错误信息: {error_detail}")
+                    
+                    # 常见错误提示
+                    if response.status_code == 401:
+                        print(f"   ⚠️  API Key 无效或已过期，请检查 RESEND_API_KEY")
+                    elif response.status_code == 403:
+                        print(f"   ⚠️  API Key 权限不足，请检查权限设置")
+                    elif response.status_code == 422:
+                        print(f"   ⚠️  请求参数错误，请检查邮箱地址格式")
+                    
                     return False
                     
+        except httpx.TimeoutException as e:
+            print(f"❌ 发送邮件超时: {e}")
+            return False
+        except httpx.RequestError as e:
+            print(f"❌ 网络请求失败: {e}")
+            return False
         except Exception as e:
-            print(f"❌ 发送邮件异常: {e}")
+            print(f"❌ 发送邮件异常: {type(e).__name__}: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return False
 
 
