@@ -35,10 +35,17 @@ class Settings(BaseSettings):
     TASK_RETENTION_DAYS: int = 7           # 任务结果保留天数
     MAX_CONCURRENT_TASKS_PER_USER: int = 3 # 每用户最大并发任务数
     
-    # JWT 配置（可选）
+    # JWT 配置
+    # 支持 JWT_SECRET 和 SECRET_KEY（向后兼容）
+    JWT_SECRET: Optional[str] = None
     SECRET_KEY: str = "formy-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 小时
+    
+    @property
+    def get_jwt_secret(self) -> str:
+        """获取 JWT 密钥（优先使用 JWT_SECRET，否则使用 SECRET_KEY）"""
+        return self.JWT_SECRET or self.SECRET_KEY
     
     # CORS 配置
     # 支持 Vercel 预览域名和生产域名

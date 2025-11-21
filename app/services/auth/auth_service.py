@@ -52,7 +52,7 @@ class AuthService:
             raise
             
         self.code_expiry = 600  # 10 分钟
-        self.jwt_secret = settings.SECRET_KEY
+        self.jwt_secret = settings.get_jwt_secret
         self.jwt_algorithm = settings.ALGORITHM
     
     def generate_code(self) -> str:
