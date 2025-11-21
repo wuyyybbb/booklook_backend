@@ -34,6 +34,7 @@ class TaskResult(BaseModel):
     """任务结果"""
     output_image: Optional[str] = Field(None, description="输出图片路径")
     thumbnail: Optional[str] = Field(None, description="缩略图路径")
+    comparison_image: Optional[str] = Field(None, description="对比图路径")
     metadata: Optional[Dict[str, Any]] = Field(None, description="元数据")
 
 

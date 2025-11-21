@@ -105,36 +105,93 @@ class ComfyUIEngine(EngineBase):
         """
         注入输入数据到工作流
         
+        根据节点命名规则注入：
+        - input:raw_image:1 -> 原始图片
+        - input:pose_image:2 -> 姿势参考图
+        
         Args:
-            workflow: 工作流定义
-            input_data: 输入数据
-            **kwargs: 其他参数
+            workflow: 工作流定义（可能是节点列表格式或 prompt 格式）
+            input_data: 输入数据（可以是文件路径或字典）
+            **kwargs: 其他参数（如 raw_image_path, pose_image_path）
             
         Returns:
-            Dict: 注入后的工作流
+            Dict: 注入后的工作流（prompt 格式，以节点 ID 为键）
         """
-        # 复制工作流，避免修改原始数据
-        workflow = workflow.copy()
+        import os
+        from pathlib import Path
         
-        # 从配置中获取节点映射
-        node_mappings = self.get_config("node_mappings", {})
-        
-        # 如果输入是字典，根据映射注入
+        # 处理输入数据
         if isinstance(input_data, dict):
-            for key, value in input_data.items():
-                if key in node_mappings:
-                    node_id, field = node_mappings[key].split(".")
-                    if node_id in workflow:
-                        workflow[node_id]["inputs"][field] = value
+            # 如果输入是字典，提取图片路径
+            raw_image_path = input_data.get("raw_image") or input_data.get("source_image")
+            pose_image_path = input_data.get("pose_image") or input_data.get("reference_image")
+        else:
+            # 如果输入是字符串，假设是原始图片路径
+            raw_image_path = input_data
+            pose_image_path = None
         
-        # 注入额外参数
-        for key, value in kwargs.items():
-            if key in node_mappings:
-                node_id, field = node_mappings[key].split(".")
-                if node_id in workflow:
-                    workflow[node_id]["inputs"][field] = value
+        # 从 kwargs 中获取（优先级更高）
+        raw_image_path = kwargs.get("raw_image_path") or kwargs.get("source_image") or raw_image_path
+        pose_image_path = kwargs.get("pose_image_path") or kwargs.get("reference_image") or pose_image_path
         
-        return workflow
+        # 转换工作流格式：从节点列表格式转换为 prompt 格式（以节点 ID 为键）
+        prompt = {}
+        nodes = workflow.get("nodes", [])
+        
+        # 如果 workflow 已经是 prompt 格式（以节点 ID 为键），直接使用
+        if not nodes and isinstance(workflow, dict):
+            # 检查是否是 prompt 格式
+            is_prompt_format = all(isinstance(k, (int, str)) and isinstance(v, dict) for k, v in workflow.items() if k not in ["nodes", "links", "extra", "config"])
+            if is_prompt_format:
+                prompt = workflow.copy()
+            else:
+                # 从节点列表构建 prompt
+                for node in workflow.get("nodes", []):
+                    node_id = node.get("id")
+                    if node_id is not None:
+                        prompt[str(node_id)] = node
+        else:
+            # 从节点列表构建 prompt
+            for node in nodes:
+                node_id = node.get("id")
+                if node_id is not None:
+                    prompt[str(node_id)] = node.copy()
+        
+        # 查找输入节点
+        raw_image_node_id = None
+        pose_image_node_id = None
+        
+        for node_id, node in prompt.items():
+            title = node.get("title", "")
+            if title == "input:raw_image:1":
+                raw_image_node_id = node_id
+            elif title == "input:pose_image:2":
+                pose_image_node_id = node_id
+        
+        # 注入原始图片
+        if raw_image_path and raw_image_node_id:
+            # 上传图片到 ComfyUI
+            uploaded_filename = self._upload_image_to_comfyui(raw_image_path)
+            if uploaded_filename:
+                # 设置节点输入
+                if "inputs" not in prompt[raw_image_node_id]:
+                    prompt[raw_image_node_id]["inputs"] = {}
+                # LoadImage 节点使用 "image" 字段
+                prompt[raw_image_node_id]["inputs"]["image"] = uploaded_filename
+                self._log(f"已注入原始图片到节点 {raw_image_node_id}: {uploaded_filename}")
+        
+        # 注入姿势参考图
+        if pose_image_path and pose_image_node_id:
+            # 上传图片到 ComfyUI
+            uploaded_filename = self._upload_image_to_comfyui(pose_image_path)
+            if uploaded_filename:
+                # 设置节点输入
+                if "inputs" not in prompt[pose_image_node_id]:
+                    prompt[pose_image_node_id]["inputs"] = {}
+                prompt[pose_image_node_id]["inputs"]["image"] = uploaded_filename
+                self._log(f"已注入姿势参考图到节点 {pose_image_node_id}: {uploaded_filename}")
+        
+        return prompt
     
     def _submit_workflow(self, workflow: Dict) -> str:
         """
@@ -257,7 +314,7 @@ class ComfyUIEngine(EngineBase):
             prompt_id: Prompt ID
             
         Returns:
-            Any: 输出数据
+            Any: 输出数据，包含 output_image 和 comparison_image
         """
         try:
             # 查询历史记录
@@ -276,7 +333,23 @@ class ComfyUIEngine(EngineBase):
             # 提取输出图片
             output_images = self._extract_output_images(outputs)
             
+            # 分离输出图片和对比图片
+            output_image = None
+            comparison_image = None
+            
+            for img in output_images:
+                if img.get("type") == "output":
+                    output_image = img
+                elif img.get("type") == "comparison":
+                    comparison_image = img
+            
+            # 如果没有找到分类的图片，使用第一个作为输出图片
+            if not output_image and output_images:
+                output_image = output_images[0]
+            
             return {
+                "output_image": output_image,
+                "comparison_image": comparison_image,
                 "images": output_images,
                 "outputs": outputs
             }
@@ -288,42 +361,123 @@ class ComfyUIEngine(EngineBase):
         """
         从输出中提取图片信息
         
+        根据节点命名规则提取：
+        - output:image:1 -> 输出图片
+        - output:image_comparer:2 -> 对比图片
+        
         Args:
-            outputs: 输出数据
+            outputs: 输出数据（节点 ID 为键）
             
         Returns:
-            list: 图片信息列表
+            list: 图片信息列表，包含 output_image 和 comparison_image
         """
         images = []
         
-        # 遍历所有输出节点
-        for node_id, node_output in outputs.items():
-            if "images" in node_output:
-                for image_info in node_output["images"]:
-                    # 构建图片 URL
-                    filename = image_info.get("filename")
-                    subfolder = image_info.get("subfolder", "")
-                    image_type = image_info.get("type", "output")
-                    
-                    if filename:
-                        image_url = f"{self.comfyui_url}/view"
-                        params = {
-                            "filename": filename,
-                            "type": image_type
-                        }
-                        if subfolder:
-                            params["subfolder"] = subfolder
+        # 需要查询工作流定义来找到输出节点
+        try:
+            workflow = self._load_workflow()
+            nodes = workflow.get("nodes", [])
+            
+            # 查找输出节点
+            output_image_node_id = None
+            comparer_image_node_id = None
+            
+            for node in nodes:
+                title = node.get("title", "")
+                node_id = node.get("id")
+                if title == "output:image:1":
+                    output_image_node_id = str(node_id)
+                elif title == "output:image_comparer:2":
+                    comparer_image_node_id = str(node_id)
+            
+            # 提取输出图片
+            if output_image_node_id and output_image_node_id in outputs:
+                node_output = outputs[output_image_node_id]
+                if "images" in node_output:
+                    for image_info in node_output["images"]:
+                        filename = image_info.get("filename")
+                        subfolder = image_info.get("subfolder", "")
+                        image_type = image_info.get("type", "output")
                         
-                        # 构建完整 URL
-                        param_str = "&".join([f"{k}={v}" for k, v in params.items()])
-                        full_url = f"{image_url}?{param_str}"
+                        if filename:
+                            image_url = f"{self.comfyui_url}/view"
+                            params = {
+                                "filename": filename,
+                                "type": image_type
+                            }
+                            if subfolder:
+                                params["subfolder"] = subfolder
+                            
+                            param_str = "&".join([f"{k}={v}" for k, v in params.items()])
+                            full_url = f"{image_url}?{param_str}"
+                            
+                            images.append({
+                                "type": "output",
+                                "filename": filename,
+                                "url": full_url,
+                                "subfolder": subfolder,
+                                "image_type": image_type
+                            })
+            
+            # 提取对比图片
+            if comparer_image_node_id and comparer_image_node_id in outputs:
+                node_output = outputs[comparer_image_node_id]
+                if "images" in node_output:
+                    for image_info in node_output["images"]:
+                        filename = image_info.get("filename")
+                        subfolder = image_info.get("subfolder", "")
+                        image_type = image_info.get("type", "temp")  # comparer 通常使用 temp 类型
                         
-                        images.append({
-                            "filename": filename,
-                            "url": full_url,
-                            "subfolder": subfolder,
-                            "type": image_type
-                        })
+                        if filename:
+                            image_url = f"{self.comfyui_url}/view"
+                            params = {
+                                "filename": filename,
+                                "type": image_type
+                            }
+                            if subfolder:
+                                params["subfolder"] = subfolder
+                            
+                            param_str = "&".join([f"{k}={v}" for k, v in params.items()])
+                            full_url = f"{image_url}?{param_str}"
+                            
+                            images.append({
+                                "type": "comparison",
+                                "filename": filename,
+                                "url": full_url,
+                                "subfolder": subfolder,
+                                "image_type": image_type
+                            })
+        except Exception as e:
+            self._log(f"查找命名输出节点失败，使用默认逻辑: {e}", "WARNING")
+        
+        # 如果没有找到命名节点，使用原来的逻辑（向后兼容）
+        if not images:
+            for node_id, node_output in outputs.items():
+                if "images" in node_output:
+                    for image_info in node_output["images"]:
+                        filename = image_info.get("filename")
+                        subfolder = image_info.get("subfolder", "")
+                        image_type = image_info.get("type", "output")
+                        
+                        if filename:
+                            image_url = f"{self.comfyui_url}/view"
+                            params = {
+                                "filename": filename,
+                                "type": image_type
+                            }
+                            if subfolder:
+                                params["subfolder"] = subfolder
+                            
+                            param_str = "&".join([f"{k}={v}" for k, v in params.items()])
+                            full_url = f"{image_url}?{param_str}"
+                            
+                            images.append({
+                                "type": "output",
+                                "filename": filename,
+                                "url": full_url,
+                                "subfolder": subfolder,
+                                "image_type": image_type
+                            })
         
         return images
     
@@ -358,6 +512,51 @@ class ComfyUIEngine(EngineBase):
             
         except Exception as e:
             raise Exception(f"下载图片失败: {e}")
+    
+    def _upload_image_to_comfyui(self, image_path: str) -> Optional[str]:
+        """
+        上传图片到 ComfyUI
+        
+        Args:
+            image_path: 本地图片路径
+            
+        Returns:
+            Optional[str]: 上传后的文件名，失败返回 None
+        """
+        import os
+        from pathlib import Path
+        
+        try:
+            # 检查文件是否存在
+            if not os.path.exists(image_path):
+                self._log(f"图片文件不存在: {image_path}", "ERROR")
+                return None
+            
+            # 读取图片文件
+            with open(image_path, 'rb') as f:
+                image_data = f.read()
+            
+            # 获取文件名
+            filename = os.path.basename(image_path)
+            
+            # 上传到 ComfyUI
+            url = f"{self.comfyui_url}/upload/image"
+            files = {
+                "image": (filename, image_data, "image/jpeg")
+            }
+            
+            response = requests.post(url, files=files, timeout=30)
+            response.raise_for_status()
+            
+            result = response.json()
+            uploaded_filename = result.get("name") or filename
+            
+            self._log(f"图片已上传到 ComfyUI: {uploaded_filename}")
+            return uploaded_filename
+            
+        except Exception as e:
+            self._log(f"上传图片到 ComfyUI 失败: {e}", "ERROR")
+            return None
     
     def health_check(self) -> bool:
         """

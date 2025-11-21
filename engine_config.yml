@@ -49,9 +49,10 @@ engines:
   comfyui_pose_transfer:
     type: comfyui
     config:
-      comfyui_url: "http://localhost:8188"
-      workflow_path: "./workflows/pose_transfer_workflow.json"
+      comfyui_url: "${COMFYUI_URL}"  # 从环境变量读取，默认 http://localhost:8188
+      workflow_path: "./workflows/pose_swap_workflow.json"
       timeout: 300
+      poll_interval: 2
 
 # ============================================
 # Pipeline 配置

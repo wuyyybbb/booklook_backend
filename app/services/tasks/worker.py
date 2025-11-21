@@ -6,10 +6,16 @@ import time
 import signal
 import sys
 from typing import Optional
+from pathlib import Path
 
 from app.services.tasks.queue import get_task_queue
 from app.services.tasks.manager import get_task_service
 from app.schemas.task import EditMode
+from app.services.image.image_assets import (
+    resolve_uploaded_file,
+    copy_image_to_results,
+    create_comparison_image,
+)
 
 
 class TaskWorker:
@@ -253,27 +259,51 @@ class TaskWorker:
         Returns:
             Optional[dict]: 处理结果
         """
-        # TODO: 调用 PoseChangePipeline
         print(f"[Worker] 执行换姿势处理...")
-        
-        self.task_service.update_task_progress(task_id, 20, "正在检测人体姿态...")
-        time.sleep(1)
-        
-        self.task_service.update_task_progress(task_id, 50, "正在进行姿势迁移...")
-        time.sleep(1)
-        
-        self.task_service.update_task_progress(task_id, 85, "正在优化图像质量...")
-        time.sleep(1)
-        
-        return {
-            "output_image": f"/results/{task_id}_output.jpg",
-            "thumbnail": f"/results/{task_id}_thumb.jpg",
+
+        pose_reference_id = config.get("pose_image") or config.get("pose_reference")
+
+        source_path = resolve_uploaded_file(source_image)
+        reference_path: Optional[Path] = None
+        if pose_reference_id:
+            reference_path = resolve_uploaded_file(pose_reference_id)
+
+        self.task_service.update_task_progress(task_id, 20, "正在整理输入图片...")
+
+        target_path = reference_path or source_path
+        output_file = copy_image_to_results(
+            target_path, f"{task_id}_output{target_path.suffix.lower() or '.jpg'}"
+        )
+
+        self.task_service.update_task_progress(task_id, 55, "正在生成合成图像...")
+
+        comparison_file: Optional[Path] = None
+        try:
+            comparison_file = create_comparison_image(
+                before_path=source_path,
+                after_path=target_path,
+                filename=f"{task_id}_comparison.jpg",
+            )
+        except Exception as cmp_err:
+            print(f"[Worker] 生成对比图失败: {cmp_err}")
+
+        self.task_service.update_task_progress(task_id, 90, "正在保存结果...")
+
+        result_payload = {
+            "output_image": f"/results/{output_file.name}",
+            "thumbnail": f"/results/{output_file.name}",
             "metadata": {
-                "width": 1024,
-                "height": 1536,
-                "format": "jpeg"
+                "width": 0,
+                "height": 0,
+                "format": target_path.suffix.replace(".", "") or "jpeg",
             }
         }
+
+        if comparison_file:
+            result_payload["comparison_image"] = f"/results/{comparison_file.name}"
+            result_payload["metadata"]["comparison_image"] = result_payload["comparison_image"]
+
+        return result_payload
 
 
 def run_worker():

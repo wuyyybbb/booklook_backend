@@ -74,7 +74,8 @@ class PipelineBase(ABC):
         self, 
         output_image: str, 
         thumbnail: Optional[str] = None,
-        metadata: Optional[dict] = None
+        metadata: Optional[dict] = None,
+        comparison_image: Optional[str] = None,
     ) -> EditTaskResult:
         """
         创建成功结果
@@ -91,6 +92,7 @@ class PipelineBase(ABC):
             success=True,
             output_image=output_image,
             thumbnail=thumbnail,
+            comparison_image=comparison_image,
             metadata=metadata or {},
             processing_time=self._get_elapsed_time()
         )
