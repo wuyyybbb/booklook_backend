@@ -28,8 +28,10 @@ MAX_UPLOAD_SIZE=10485760
 TASK_RETENTION_DAYS=7
 MAX_CONCURRENT_TASKS_PER_USER=3
 
-# JWT 配置（可选）
-SECRET_KEY=formy-secret-key-change-in-production
+# JWT 配置
+# 重要：JWT_SECRET 和 SECRET_KEY 必须设置为相同的值，确保登录签名和验签使用同一个密钥
+JWT_SECRET=formy_super_secret_2025
+SECRET_KEY=formy_super_secret_2025
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
 
