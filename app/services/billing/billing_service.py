@@ -24,7 +24,7 @@ class BillingService:
     
     def _get_user_key(self, user_id: str) -> str:
         """获取用户在 Redis 中的键"""
-        return f"user:{user_id}"
+        return f"user:id:{user_id}"
     
     def get_user(self, user_id: str) -> Optional[User]:
         """
