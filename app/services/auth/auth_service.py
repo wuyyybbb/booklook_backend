@@ -152,13 +152,17 @@ class AuthService:
                 # 更新最后登录时间
                 user.last_login = datetime.now()
             else:
-                # 创建新用户
+                # 创建新用户，分配免费算力
                 user = User(
                     user_id=generate_user_id(),
                     email=email,
                     username=email.split('@')[0],
                     created_at=datetime.now(),
-                    last_login=datetime.now()
+                    last_login=datetime.now(),
+                    # 新用户默认赠送 100 免费算力（约 2-3 次换姿势）
+                    current_plan_id=None,  # 免费用户没有套餐
+                    current_credits=100,  # 赠送 100 算力
+                    plan_renew_at=None
                 )
             
             # 保存用户信息
