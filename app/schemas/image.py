@@ -3,6 +3,7 @@
 """
 from pydantic import BaseModel, Field
 from datetime import datetime
+from typing import Optional
 
 
 class UploadImageResponse(BaseModel):
@@ -28,4 +29,12 @@ class ImageInfo(BaseModel):
     height: int
     format: str
     url: str
+
+
+class PoseChangeConfig(BaseModel):
+    """姿态变换配置"""
+    pose_image: Optional[str] = Field(None, description="姿势参考图的 URL 或 base64")
+    
+    class Config:
+        extra = "allow"  # 允许额外字段透传
 
