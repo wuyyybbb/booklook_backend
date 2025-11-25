@@ -94,14 +94,18 @@ async def create_task(
         
         print(f"✓ 算力扣除成功，剩余 {user_billing.current_credits - required_credits} 算力")
         
-        # 4. 创建任务
+        # 4. 创建任务 - 传递 user_id 和消耗的积分
         task_service = get_task_service()
-        task_info = task_service.create_task(request)
+        task_info = task_service.create_task(
+            request, 
+            user_id=current_user_id,
+            credits_consumed=required_credits
+        )
         
         # 在任务信息中记录消耗的算力（可选）
         task_info.credits_consumed = required_credits
         
-        print(f"✓ 任务创建成功: {task_info.task_id}")
+        print(f"✓ Task created successfully: {task_info.task_id}, Credits: {required_credits}")
         
         return task_info
         
