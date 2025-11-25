@@ -8,6 +8,7 @@ import time
 
 from app.services.image.dto import EditTaskInput, EditTaskResult
 from app.services.image.enums import ProcessingStep
+from app.core.error_codes import TaskErrorCode
 
 
 class PipelineBase(ABC):
@@ -97,12 +98,17 @@ class PipelineBase(ABC):
             processing_time=self._get_elapsed_time()
         )
     
-    def _create_error_result(self, error_message: str) -> EditTaskResult:
+    def _create_error_result(
+        self, 
+        error_message: str,
+        error_code: Optional[str] = None
+    ) -> EditTaskResult:
         """
         创建错误结果
         
         Args:
             error_message: 错误信息
+            error_code: 错误码（可选，建议使用 TaskErrorCode）
             
         Returns:
             EditTaskResult: 结果对象
@@ -110,6 +116,7 @@ class PipelineBase(ABC):
         return EditTaskResult(
             success=False,
             error_message=error_message,
+            error_code=error_code,
             processing_time=self._get_elapsed_time()
         )
     

@@ -11,6 +11,7 @@ from app.services.image.enums import ProcessingStep
 from app.services.image.engines.registry import get_engine_registry
 from app.services.image.image_assets import resolve_uploaded_file, copy_image_to_results
 from app.core.config import settings
+from app.core.error_codes import TaskErrorCode
 
 
 class PoseChangePipeline(PipelineBase):
@@ -43,7 +44,10 @@ class PoseChangePipeline(PipelineBase):
         try:
             # 1. 验证输入
             if not self.validate_input(task_input):
-                return self._create_error_result("输入参数验证失败")
+                return self._create_error_result(
+                    "输入参数验证失败",
+                    error_code=TaskErrorCode.INVALID_REQUEST.value
+                )
             
             # 2. 解析配置
             config = self._parse_config(task_input.config)
@@ -59,7 +63,10 @@ class PoseChangePipeline(PipelineBase):
             
         except Exception as e:
             self._log_step(ProcessingStep.COMPLETE, f"执行失败: {e}")
-            return self._create_error_result(str(e))
+            return self._create_error_result(
+                str(e),
+                error_code=TaskErrorCode.PIPELINE_ERROR.value
+            )
     
     def validate_input(self, task_input: EditTaskInput) -> bool:
         """
@@ -149,7 +156,10 @@ class PoseChangePipeline(PipelineBase):
             source_path = resolve_uploaded_file(source_image)
             pose_path = resolve_uploaded_file(config.pose_reference)
         except Exception as e:
-            return self._create_error_result(f"加载图片失败: {e}")
+            return self._create_error_result(
+                f"加载图片失败: {e}",
+                error_code=TaskErrorCode.IMAGE_LOAD_FAILED.value
+            )
         
         # Step 2: 调用 ComfyUI Engine (30%)
         self._update_progress(30, "正在调用 AI 引擎...")
@@ -167,7 +177,19 @@ class PoseChangePipeline(PipelineBase):
             
         except Exception as e:
             self._log_step(ProcessingStep.COMPLETE, f"AI 引擎执行失败: {e}")
-            return self._create_error_result(f"姿势迁移失败: {e}")
+            # 根据异常类型选择错误码
+            error_msg = str(e).lower()
+            if "timeout" in error_msg:
+                error_code = TaskErrorCode.COMFYUI_CONNECTION_TIMEOUT
+            elif "connection" in error_msg:
+                error_code = TaskErrorCode.COMFYUI_NOT_AVAILABLE
+            else:
+                error_code = TaskErrorCode.COMFYUI_PROCESSING_FAILED
+            
+            return self._create_error_result(
+                f"姿势迁移失败: {e}",
+                error_code=error_code.value
+            )
         
         # Step 3: 下载并保存结果图片 (80%)
         self._update_progress(80, "正在保存结果...")
@@ -179,12 +201,18 @@ class PoseChangePipeline(PipelineBase):
             comparison_image_info = result.get("comparison_image")
             
             if not output_image_info:
-                return self._create_error_result("未获取到输出图片")
+                return self._create_error_result(
+                    "未获取到输出图片",
+                    error_code=TaskErrorCode.COMFYUI_RESULT_NOT_FOUND.value
+                )
             
             # 下载输出图片
             output_url = output_image_info.get("url")
             if not output_url:
-                return self._create_error_result("输出图片 URL 为空")
+                return self._create_error_result(
+                    "输出图片 URL 为空",
+                    error_code=TaskErrorCode.COMFYUI_RESULT_NOT_FOUND.value
+                )
             
             # 下载图片到本地
             import requests
@@ -247,6 +275,9 @@ class PoseChangePipeline(PipelineBase):
             
         except Exception as e:
             self._log_step(ProcessingStep.COMPLETE, f"保存结果失败: {e}")
-            return self._create_error_result(f"保存结果失败: {e}")
+            return self._create_error_result(
+                f"保存结果失败: {e}",
+                error_code=TaskErrorCode.RESULT_SAVE_FAILED.value
+            )
     
 

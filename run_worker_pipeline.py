@@ -13,6 +13,7 @@ from app.services.tasks.manager import get_task_service
 from app.schemas.task import EditMode
 from app.services.image.pipelines.pose_change_pipeline import PoseChangePipeline
 from app.services.image.dto import EditTaskInput
+from app.core.error_codes import TaskErrorCode, create_error
 
 
 class PipelineWorker:
@@ -108,11 +109,15 @@ class PipelineWorker:
             if not task_data:
                 error_msg = f"任务数据不存在: {task_id}"
                 print(f"[Worker] ❌ {error_msg}")
+                error = create_error(
+                    TaskErrorCode.TASK_DATA_NOT_FOUND,
+                    custom_details=f"任务 ID: {task_id}"
+                )
                 self.task_service.fail_task(
                     task_id=task_id,
-                    error_code="TASK_DATA_NOT_FOUND",
-                    error_message="无法获取任务数据",
-                    error_details=f"任务 {task_id} 在 Redis 中不存在"
+                    error_code=error["code"],
+                    error_message=error["message"],
+                    error_details=error["details"]
                 )
                 return
             
@@ -128,21 +133,23 @@ class PipelineWorker:
             
             # 3. 验证必要参数
             if not mode:
+                error = create_error(TaskErrorCode.INVALID_MODE)
                 self.task_service.fail_task(
                     task_id=task_id,
-                    error_code="INVALID_MODE",
-                    error_message="任务模式 (mode) 缺失",
-                    error_details="请求中未指定编辑模式"
+                    error_code=error["code"],
+                    error_message=error["message"],
+                    error_details=error["details"]
                 )
                 print(f"[Worker] ❌ 任务模式缺失")
                 return
             
             if not source_image:
+                error = create_error(TaskErrorCode.INVALID_SOURCE_IMAGE)
                 self.task_service.fail_task(
                     task_id=task_id,
-                    error_code="INVALID_SOURCE_IMAGE",
-                    error_message="原始图片 (source_image) 缺失",
-                    error_details="请求中未指定原始图片路径"
+                    error_code=error["code"],
+                    error_message=error["message"],
+                    error_details=error["details"]
                 )
                 print(f"[Worker] ❌ 原始图片缺失")
                 return
@@ -171,11 +178,15 @@ class PipelineWorker:
                 if result.get('comparison_image'):
                     print(f"[Worker] 🔀 对比图片: {result.get('comparison_image')}")
             else:
+                error = create_error(
+                    TaskErrorCode.PROCESSING_FAILED,
+                    custom_details=f"处理模式: {mode}"
+                )
                 self.task_service.fail_task(
                     task_id=task_id,
-                    error_code="PROCESSING_FAILED",
-                    error_message="Pipeline 处理失败",
-                    error_details=f"模式 {mode} 的处理流程返回了空结果"
+                    error_code=error["code"],
+                    error_message=error["message"],
+                    error_details=error["details"]
                 )
                 print(f"[Worker] ❌ 任务失败: {task_id} - Pipeline 返回空结果")
                 
@@ -189,11 +200,16 @@ class PipelineWorker:
             
             # 标记任务失败，包含详细的错误信息
             try:
+                error = create_error(
+                    TaskErrorCode.INTERNAL_ERROR,
+                    custom_message=f"任务处理异常: {type(e).__name__}",
+                    custom_details=f"异常信息: {str(e)}\n\n堆栈跟踪:\n{error_traceback}"
+                )
                 self.task_service.fail_task(
                     task_id=task_id,
-                    error_code="INTERNAL_ERROR",
-                    error_message=f"任务处理异常: {type(e).__name__}",
-                    error_details=f"{str(e)}\n\n堆栈跟踪:\n{error_traceback}"
+                    error_code=error["code"],
+                    error_message=error["message"],
+                    error_details=error["details"]
                 )
             except Exception as fail_error:
                 print(f"[Worker] ⚠️  无法标记任务失败: {fail_error}")
@@ -307,15 +323,28 @@ class PipelineWorker:
                 print(f"[Worker] 🔴 错误码: {result.error_code}")
                 print(f"[Worker] 📝 错误信息: {result.error_message}")
                 
+                # 使用统一错误码
+                error_code = TaskErrorCode.PIPELINE_ERROR
+                if result.error_code:
+                    # 尝试将 Pipeline 返回的错误码转换为标准错误码
+                    try:
+                        error_code = TaskErrorCode(result.error_code)
+                    except ValueError:
+                        # 如果不是标准错误码，使用默认值
+                        pass
+                
+                error = create_error(
+                    error_code,
+                    custom_message=result.error_message or None,
+                    custom_details=f"Pipeline 错误详情: {result.error_message or '未知错误'}"
+                )
+                
                 # 将 Pipeline 错误传递到任务状态
                 self.task_service.fail_task(
                     task_id=task_id,
-                    error_code=result.error_code or "PIPELINE_ERROR",
-                    error_message=result.error_message or "Pipeline 执行失败",
-                    error_details=f"Pipeline 返回失败结果。可能的原因：\n"
-                                 f"- ComfyUI 服务不可用\n"
-                                 f"- 图片格式不正确\n"
-                                 f"- 配置参数错误"
+                    error_code=error["code"],
+                    error_message=error["message"],
+                    error_details=error["details"]
                 )
                 return None
                 
@@ -327,12 +356,25 @@ class PipelineWorker:
             error_trace = traceback.format_exc()
             print(error_trace)
             
+            # 根据异常类型选择错误码
+            error_code = TaskErrorCode.PIPELINE_ERROR
+            if "timeout" in str(e).lower():
+                error_code = TaskErrorCode.PIPELINE_TIMEOUT
+            elif "connection" in str(e).lower():
+                error_code = TaskErrorCode.ENGINE_CONNECTION_FAILED
+            
+            error = create_error(
+                error_code,
+                custom_message=f"Pipeline 执行异常: {type(e).__name__}",
+                custom_details=f"异常信息: {str(e)}\n\n堆栈跟踪:\n{error_trace}"
+            )
+            
             # 记录详细错误
             self.task_service.fail_task(
                 task_id=task_id,
-                error_code="PIPELINE_EXCEPTION",
-                error_message=f"Pipeline 执行异常: {type(e).__name__}",
-                error_details=f"{str(e)}\n\n堆栈:\n{error_trace}"
+                error_code=error["code"],
+                error_message=error["message"],
+                error_details=error["details"]
             )
             return None
     
