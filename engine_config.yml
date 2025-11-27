@@ -53,8 +53,6 @@ engines:
       workflow_path: "./workflows/pose_swap_workflow.json"
       timeout: ${COMFYUI_TIMEOUT:300}  # 超时时间（秒），默认300
       poll_interval: ${COMFYUI_POLL_INTERVAL:2}  # 轮询间隔（秒），默认2
-      timeout: ${COMFYUI_TIMEOUT:300}  # 超时时间（秒），默认300
-      poll_interval: ${COMFYUI_POLL_INTERVAL:2}  # 轮询间隔（秒），默认2
 
 # ============================================
 # Pipeline 配置
