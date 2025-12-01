@@ -133,7 +133,7 @@ class Settings(BaseSettings):
     
     # ==================== 邮件服务配置 ====================
     # 邮件提供商：resend / aliyun / smtp
-    EMAIL_PROVIDER: str = "resend"
+    EMAIL_PROVIDER: str = "smtp"  # 默认使用 Gmail SMTP
     
     # Resend 配置
     RESEND_API_KEY: Optional[str] = None
@@ -144,15 +144,15 @@ class Settings(BaseSettings):
     ALIYUN_EMAIL_ACCESS_KEY_ID: Optional[str] = None
     ALIYUN_EMAIL_ACCESS_KEY_SECRET: Optional[str] = None
     
-    # SMTP 配置（通用）
-    SMTP_HOST: Optional[str] = None
-    SMTP_PORT: int = 587
-    SMTP_USER: Optional[str] = None
-    SMTP_PASSWORD: Optional[str] = None
-    SMTP_USE_TLS: bool = True
+    # SMTP 配置（Gmail SMTP）
+    SMTP_HOST: Optional[str] = "smtp.gmail.com"  # Gmail SMTP 服务器
+    SMTP_PORT: int = 587  # Gmail SMTP 端口（TLS）
+    SMTP_USER: Optional[str] = None  # Gmail 邮箱地址
+    SMTP_PASSWORD: Optional[str] = None  # Gmail 应用专用密码
+    SMTP_USE_TLS: bool = True  # 使用 TLS 加密
     
     # 发件人配置
-    FROM_EMAIL: str = "noreply@formy.com"
+    FROM_EMAIL: str = "wuyebei3206@gmail.com"  # Gmail 发件邮箱
     FROM_NAME: str = "Formy"
     
     # ==================== 日志配置 ====================

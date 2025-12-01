@@ -13,7 +13,7 @@ from app.schemas.auth import (
     CurrentUserResponse
 )
 from app.services.auth.auth_service import get_auth_service
-from app.services.email.resend_service import get_email_service
+from app.services.email.email_factory import get_email_service
 
 
 router = APIRouter()
@@ -52,13 +52,28 @@ async def send_verification_code(request: SendCodeRequest):
         # 发送邮件
         print(f"📤 正在发送邮件到 {request.email}...")
         
-        # 检查 API Key 是否配置
-        if not email_service.api_key:
-            print(f"❌ RESEND_API_KEY 未配置")
-            raise HTTPException(
-                status_code=500,
-                detail="邮件服务未配置，请检查 RESEND_API_KEY 环境变量"
-            )
+        # 检查邮件服务配置（根据服务类型检查不同的配置项）
+        from app.core.config import settings
+        if settings.EMAIL_PROVIDER == "resend":
+            if not hasattr(email_service, 'api_key') or not email_service.api_key:
+                print(f"❌ RESEND_API_KEY 未配置")
+                raise HTTPException(
+                    status_code=500,
+                    detail="邮件服务未配置，请检查 RESEND_API_KEY 环境变量"
+                )
+        elif settings.EMAIL_PROVIDER == "smtp":
+            if not hasattr(email_service, 'username') or not email_service.username:
+                print(f"❌ SMTP_USER 未配置")
+                raise HTTPException(
+                    status_code=500,
+                    detail="邮件服务未配置，请检查 SMTP_USER 环境变量"
+                )
+            if not hasattr(email_service, 'password') or not email_service.password:
+                print(f"❌ SMTP_PASSWORD 未配置")
+                raise HTTPException(
+                    status_code=500,
+                    detail="邮件服务未配置，请检查 SMTP_PASSWORD 环境变量"
+                )
         
         send_result = await email_service.send_verification_code(request.email, code)
         print(f"📤 发送结果: {send_result}")
@@ -66,11 +81,10 @@ async def send_verification_code(request: SendCodeRequest):
         if not send_result:
             print(f"❌ 邮件发送失败，请查看上方详细错误信息")
             
-            # 检查是否是 Resend 免费版限制
-            # 这个信息会在邮件服务的日志中显示，但我们也在这里提供更友好的错误提示
+            # 邮件发送失败
             raise HTTPException(
                 status_code=500,
-                detail="发送邮件失败。如果是 Resend 免费版，只能发送到账户注册邮箱。请查看后端日志获取详细错误信息。"
+                detail="发送邮件失败，请查看后端日志获取详细错误信息。"
             )
         
         print(f"✅ 验证码发送成功: {request.email}")
@@ -223,17 +237,31 @@ async def test_email_service(email: str = "test@example.com"):
     发送一封测试邮件到指定邮箱，用于诊断邮件服务问题
     """
     try:
-        from app.services.email.resend_service import get_email_service
+        from app.services.email.email_factory import get_email_service
+        from app.core.config import settings
         
         email_service = get_email_service()
         
-        # 检查配置
+        # 检查配置（根据服务类型）
         config_status = {
-            "api_key_configured": bool(email_service.api_key),
-            "api_key_length": len(email_service.api_key) if email_service.api_key else 0,
-            "api_key_preview": f"{email_service.api_key[:10]}...{email_service.api_key[-5:]}" if email_service.api_key and len(email_service.api_key) > 15 else "N/A",
+            "provider": settings.EMAIL_PROVIDER,
             "from_email": email_service.from_email,
         }
+        
+        if settings.EMAIL_PROVIDER == "resend":
+            config_status.update({
+                "api_key_configured": bool(hasattr(email_service, 'api_key') and email_service.api_key),
+                "api_key_length": len(email_service.api_key) if hasattr(email_service, 'api_key') and email_service.api_key else 0,
+                "api_key_preview": f"{email_service.api_key[:10]}...{email_service.api_key[-5:]}" if hasattr(email_service, 'api_key') and email_service.api_key and len(email_service.api_key) > 15 else "N/A",
+            })
+        elif settings.EMAIL_PROVIDER == "smtp":
+            config_status.update({
+                "smtp_host": email_service.host if hasattr(email_service, 'host') else "N/A",
+                "smtp_port": email_service.port if hasattr(email_service, 'port') else "N/A",
+                "smtp_user": email_service.username if hasattr(email_service, 'username') else "N/A",
+                "smtp_password_configured": bool(hasattr(email_service, 'password') and email_service.password),
+                "use_tls": email_service.use_tls if hasattr(email_service, 'use_tls') else "N/A",
+            })
         
         # 尝试发送测试邮件
         test_code = "123456"
