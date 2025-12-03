@@ -53,7 +53,7 @@ app.include_router(routes_billing.router, prefix=settings.API_V1_PREFIX, tags=["
 async def root():
     """根路径"""
     return {
-        "message": "Formy API",
+        "message": "Booklook API",
         "version": settings.APP_VERSION,
         "docs": "/docs"
     }
@@ -73,7 +73,7 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", settings.PORT))
     
     print(f"\n{'='*60}")
-    print(f"🚀 Starting Formy Backend Server")
+    print(f"🚀 Starting Booklook Backend Server")
     print(f"{'='*60}")
     print(f"Host: {settings.HOST}")
     print(f"Port: {port}")

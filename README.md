@@ -1,4 +1,4 @@
-# 🎨 Formy Backend
+# 🎨 Booklook Backend
 
 AI 视觉创作工具后端服务 - 专为服装行业打造
 
@@ -6,7 +6,7 @@ AI 视觉创作工具后端服务 - 专为服装行业打造
 
 ## 📖 项目简介
 
-Formy Backend 是一个基于 FastAPI 的 RESTful API 服务，提供：
+Booklook Backend 是一个基于 FastAPI 的 RESTful API 服务，提供：
 
 - 🖼️ **图像上传与管理**
 - 🔄 **AI 任务处理**（换头、换背景、换姿势）

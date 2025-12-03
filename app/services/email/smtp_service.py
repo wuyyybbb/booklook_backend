@@ -131,8 +131,8 @@ class SMTPEmailService:
             <body>
                 <div class="container">
                     <div class="logo">
-                        <div class="logo-box">F</div>
-                        <h1 style="margin: 10px 0; font-size: 28px;">Formy｜形我</h1>
+                        <div class="logo-box">B</div>
+                        <h1 style="margin: 10px 0; font-size: 28px;">Booklook｜形我</h1>
                     </div>
                     
                     <div class="title">验证码登录</div>
@@ -149,7 +149,7 @@ class SMTPEmailService:
                     </div>
                     
                     <div class="footer">
-                        © 2025 Formy｜形我. All rights reserved.<br>
+                        © 2025 Booklook｜形我. All rights reserved.<br>
                         AI 视觉创作工具 - 专为服装行业打造
                     </div>
                 </div>
@@ -159,7 +159,7 @@ class SMTPEmailService:
             
             # 纯文本版本（备用）
             text_content = f"""
-Formy｜形我 - 验证码登录
+Booklook｜形我 - 验证码登录
 
 您的登录验证码是: {code}
 
@@ -167,14 +167,14 @@ Formy｜形我 - 验证码登录
 🔒 请勿将验证码告知他人
 ⚠️ 如非本人操作，请忽略此邮件
 
-© 2025 Formy｜形我. All rights reserved.
+© 2025 Booklook｜形我. All rights reserved.
             """.strip()
             
             # 创建邮件消息
             msg = MIMEMultipart('alternative')
             msg['From'] = f"{self.from_name} <{self.from_email}>"
             msg['To'] = to_email
-            msg['Subject'] = f"【Formy】您的验证码是 {code}"
+            msg['Subject'] = f"【Booklook】您的验证码是 {code}"
             
             # 添加文本和 HTML 内容
             text_part = MIMEText(text_content, 'plain', 'utf-8')
@@ -272,4 +272,5 @@ def get_email_service() -> SMTPEmailService:
     if _email_service is None:
         _email_service = SMTPEmailService()
     return _email_service
+
 

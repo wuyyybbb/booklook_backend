@@ -1,5 +1,5 @@
 """
-Formy 后端应用
+Booklook 后端应用
 """
 __version__ = "1.0.0"
 

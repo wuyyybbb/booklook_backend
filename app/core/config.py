@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     """应用配置类 - 所有配置项都可通过环境变量覆盖"""
     
     # ==================== 应用基础配置 ====================
-    APP_NAME: str = "Formy"
+    APP_NAME: str = "Booklook"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False  # 生产环境默认关闭 Debug
     ENVIRONMENT: str = "production"  # development / staging / production
@@ -153,7 +153,7 @@ class Settings(BaseSettings):
     
     # 发件人配置
     FROM_EMAIL: str = "wuyebei3206@gmail.com"  # Gmail 发件邮箱
-    FROM_NAME: str = "Formy"
+    FROM_NAME: str = "Booklook"
     
     # ==================== 日志配置 ====================
     LOG_LEVEL: str = "INFO"  # DEBUG / INFO / WARNING / ERROR

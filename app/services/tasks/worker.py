@@ -309,7 +309,7 @@ class TaskWorker:
 def run_worker():
     """运行 Worker（入口函数）"""
     print("="*50)
-    print("Formy Task Worker")
+    print("Booklook Task Worker")
     print("="*50)
     
     # 检查 Redis 连接

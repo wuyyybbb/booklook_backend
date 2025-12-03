@@ -126,8 +126,8 @@ class ResendEmailService:
             <body>
                 <div class="container">
                     <div class="logo">
-                        <div class="logo-box">F</div>
-                        <h1 style="margin: 10px 0; font-size: 28px;">Formy｜形我</h1>
+                        <div class="logo-box">B</div>
+                        <h1 style="margin: 10px 0; font-size: 28px;">Booklook｜形我</h1>
                     </div>
                     
                     <div class="title">验证码登录</div>
@@ -144,7 +144,7 @@ class ResendEmailService:
                     </div>
                     
                     <div class="footer">
-                        © 2025 Formy｜形我. All rights reserved.<br>
+                        © 2025 Booklook｜形我. All rights reserved.<br>
                         AI 视觉创作工具 - 专为服装行业打造
                     </div>
                 </div>
@@ -156,7 +156,7 @@ class ResendEmailService:
             request_data = {
                 "from": self.from_email,  # Resend 推荐直接使用邮箱地址
                 "to": [to_email],
-                "subject": f"【Formy】您的验证码是 {code}",
+                "subject": f"【Booklook】您的验证码是 {code}",
                 "html": html_content,
             }
             

@@ -26,3 +26,4 @@ def get_email_service() -> Union[ResendEmailService, SMTPEmailService]:
         print(f"⚠️  未知的邮件提供商: {provider}，默认使用 SMTP")
         return SMTPEmailService()
 
+
